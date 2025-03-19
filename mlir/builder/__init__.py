@@ -1,4 +1,4 @@
-from .builder import IRBuilder
+from .builder import IRBuilder, DialectBuilder, AffineBuilder
 from .match import Reads, Writes, Isa, All, And, Or, Not
 
 
@@ -12,6 +12,14 @@ __doc__ = """
 
 
 __all__ = [
-        'IRBuilder',
-
-        'Reads', 'Writes', 'Isa', 'All', 'And', 'Or', 'Not']
+    "IRBuilder",
+    "DialectBuilder",
+    "AffineBuilder",
+    "Reads",
+    "Writes",
+    "Isa",
+    "All",
+    "And",
+    "Or",
+    "Not",
+]
