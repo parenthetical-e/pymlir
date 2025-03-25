@@ -1,10 +1,51 @@
-from lark import v_args, Transformer
+from lark import Transformer, v_args
 from lark.exceptions import GrammarError
 from lark.visitors import Discard
+
 from mlir import astnodes
 
 
-class TreeToMlir(Transformer):
+class TreetoMLIR(Transformer):
+    """
+    Transforms a Lark parse tree into an MLIR Abstract Syntax Tree.
+
+    This class uses Lark's Transformer pattern to convert parse tree nodes into
+    MLIR-specific AST nodes. Each method in this class corresponds to a grammar rule
+    with the same name in the Lark grammar file (mlir/lark/mlir.lark),
+    and Lark automatically calls these methods when traversing
+    the parse tree.
+
+    The transformation works in a bottom-up manner:
+    1. Lark traverses the parse tree from leaves to root
+    2. For each node, it calls the method matching the grammar rule name
+    3. The method receives already-transformed children as arguments
+    4. The returned value replaces the node in the transformed tree
+
+    Implementation details:
+
+    - Transformation methods in this class use three main approaches:
+    - Lambda functions for simple conversions (e.g., string to integer)
+    - Direct assignments to AST node constructors (e.g., ssa_id = astnodes.SsaId.from_lark)
+    - Regular methods with custom logic for more complex transformations
+
+    AST node creation works differently from standard python AST visitor pattern
+    that you might expect given we use that AST pattern in the mlir/astnodes.py file.
+    This is because Lark's Transformer pattern is more flexible and allows for
+    more complex transformations ...and is just how Lark works.
+
+    - Method names match grammar rule names exactly (not using visit_X prefix)
+    - Bottom-up traversal (children processed before parents) vs. top-down
+    - Return values replace nodes in tree rather than being ignored
+    - Automatic method dispatching based on grammar rule names
+    - More declarative style that closely maps to the grammar structure
+
+    Usage:
+        parser = Lark(mlir_grammar)
+        parse_tree = parser.parse(mlir_code)
+        transformer = TreetoMLIR()
+        mlir_ast = transformer.transform(parse_tree)
+    """
+
     ###############################################################
     # Low-level literal syntax
     digit = lambda self, val: int(val[0])
@@ -24,11 +65,11 @@ class TreeToMlir(Transformer):
     # Literals
     @v_args(inline=True)
     def decimal_literal(self, *digits):
-        return int(''.join(str(d) for d in digits))
+        return int("".join(str(d) for d in digits))
 
     @v_args(inline=True)
     def hexadecimal_literal(self, *digits):
-        return '0x' + ''.join(digits)
+        return "0x" + "".join(digits)
 
     negated_integer_literal = lambda self, value: -value[0]
     float_literal = lambda self, value: float(value[0])
@@ -39,11 +80,11 @@ class TreeToMlir(Transformer):
 
     @v_args(inline=True)
     def bare_id(self, *elements):
-        return ''.join(str(s) for s in elements)
+        return "".join(str(s) for s in elements)
 
     @v_args(inline=True)
     def suffix_id(self, *suffix):
-        return ''.join(str(s) for s in suffix)
+        return "".join(str(s) for s in suffix)
 
     ###############################################################
     # MLIR Identifiers
@@ -63,7 +104,9 @@ class TreeToMlir(Transformer):
     BF16 = lambda self, tok: astnodes.FloatTypeEnum("bf16")
     F32 = lambda self, tok: astnodes.FloatTypeEnum("f32")
     F64 = lambda self, tok: astnodes.FloatTypeEnum("f64")
-    float_type = lambda self, tok: astnodes.FloatType(astnodes.FloatTypeEnum(tok[0].value))
+    float_type = lambda self, tok: astnodes.FloatType(
+        astnodes.FloatTypeEnum(tok[0].value)
+    )
     index_type = astnodes.IndexType.from_lark
     signed_integer_type = astnodes.SignedIntegerType.from_lark
     unsigned_integer_type = astnodes.UnsignedIntegerType.from_lark
@@ -73,7 +116,8 @@ class TreeToMlir(Transformer):
     vector_type = astnodes.VectorType.from_lark
     ranked_tensor_type = astnodes.RankedTensorType.from_lark
     unranked_tensor_type = lambda self, value: astnodes.UnrankedTensorType(
-        value[1])  # gets rid of literal "*x"
+        value[1]
+    )  # gets rid of literal "*x"
     ranked_memref_type = astnodes.RankedMemRefType.from_lark
     unranked_memref_type = astnodes.UnrankedMemRefType.from_lark
     opaque_dialect_item = astnodes.OpaqueDialectType.from_lark
@@ -235,8 +279,7 @@ class TreeToMlir(Transformer):
     attribute_entry = lambda self, value: value[0]
     trailing_type = lambda self, value: value[0]
     trailing_location = lambda self, value: value[0]
-    function_result_list_parens = lambda self, value: (value[0]
-                                                       if value else [])
+    function_result_list_parens = lambda self, value: (value[0] if value else [])
     symbol_or_const = lambda self, value: value[0]
     affine_map = lambda self, value: value[0]
     semi_affine_map = lambda self, value: value[0]
@@ -259,10 +302,14 @@ class TreeToMlir(Transformer):
             return astnodes.MLIRFile(defns, [])
         else:
             fns = [astnodes.Operation([], fn) for fn in fns]
-            return astnodes.MLIRFile(defns, [
-                astnodes.Module(None, None,
-                                astnodes.Region([astnodes.Block(None, fns)]))
-            ])
+            return astnodes.MLIRFile(
+                defns,
+                [
+                    astnodes.Module(
+                        None, None, astnodes.Region([astnodes.Block(None, fns)])
+                    )
+                ],
+            )
 
     def mlir_file_as_definition_and_module_list(self, defns_and_mods):
         assert isinstance(defns_and_mods, list)
