@@ -1,197 +1,220 @@
+// MLIR Lark Grammar File
+//
+// This file defines the grammar for the MLIR (Multi-Level Intermediate Representation) language using Lark.
+//
+// Lark is a parsing toolkit for Python that allows you to define a grammar using a simple syntax.
+// It works by:
+// 1. Defining tokens (basic building blocks like numbers, strings, identifiers)
+// 2. Creating rules that describe how these tokens can be combined
+// 3. Building a parse tree from input text that matches these rules
+//
+// When this grammar file is loaded by the Lark parser, it creates a parser that can:
+// - Validate if MLIR code is syntactically correct
+// - Convert MLIR text into a structured tree representation
+// - Enable tools to manipulate MLIR programmatically
+//
+// The grammar below defines everything from basic literals (numbers, strings) to complex
+// constructs like operations, types, and control flow structures that make up the MLIR language.
+//
+//
 // Adapted from https://github.com/llvm/llvm-project/blob/5b4a01d4a63cb66ab981e52548f940813393bf42/mlir/docs/LangRef.md
 
 // ----------------------------------------------------------------------
 // Low-level literal syntax
-digit      : /[0-9]/
-digits     : /[0-9]+/
-hex_digit  : /[0-9a-fA-F]/
-hex_digits : /[0-9a-fA-F]+/
-letter     : /[a-zA-Z]/
-letters    : /[a-zA-Z]+/
-id_punct   : /[$._-]/
-underscore : /[_]/
-true       : "true"
-false      : "false"
+// These rules define the basic building blocks of the grammar
 
-id_chars: /[$.]/
+// Basic digit and character patterns
+digit             : /[0-9]/                   // Matches a single digit 
+digits            : /[0-9]+/                  // Matches one or more digits
+hex_digit         : /[0-9a-fA-F]/             // Matches a single hexadecimal digit (0-9, a-f, A-F)
+hex_digits        : /[0-9a-fA-F]+/            // Matches one or more hexadecimal digits
+letter            : /[a-zA-Z]/                // Matches a single letter
+letters           : /[a-zA-Z]+/               // Matches one or more letters
+id_punct          : /[$._-]/                  // Special characters allowed in identifiers
+underscore        : /[_]/                     // Underscore character for identifiers
+true              : "true"                    // Boolean literal 'true'
+false             : "false"                   // Boolean literal 'false'
 
-bool_literal : true | false
-decimal_literal : digits
-hexadecimal_literal : "0x" hex_digits
-integer_literal : decimal_literal | hexadecimal_literal
-negated_integer_literal : "-" integer_literal
-?posneg_integer_literal : integer_literal | negated_integer_literal
-float_literal : /[-+]?[0-9]+[.][0-9]*([eE][-+]?[0-9]+)?/
-string_literal  : ESCAPED_STRING
-constant_literal : bool_literal | integer_literal | float_literal | string_literal
+id_chars          : /[$.]/                    // Characters allowed in identifiers
 
-// Identifier syntax
-bare_id : (letter| underscore) (letter|digit|underscore|id_chars)*
-suffix_id : digits | ((letter | id_punct) (letter | id_punct | digits)*)
+// Literal values of different types
+bool_literal             : true | false                                        // Boolean literal (true/false)
+decimal_literal          : digits                                              // Decimal numbers like 42
+hexadecimal_literal      : "0x" hex_digits                                     // Hex numbers like 0x2A
+integer_literal          : decimal_literal | hexadecimal_literal               // Any integer literal
+negated_integer_literal  : "-" integer_literal                                 // Negative integers like -42
+?posneg_integer_literal  : integer_literal | negated_integer_literal           // Positive or negative integers
+float_literal            : /[-+]?[0-9]+[.][0-9]*([eE][-+]?[0-9]+)?/            // Floating point literals like 3.14 or 1.0e-10
+string_literal           : ESCAPED_STRING                                      // String literals like "hello"
+constant_literal         : bool_literal | integer_literal | float_literal | string_literal  // Any literal value
 
-// Dimensions
-dimension : "?" | decimal_literal
-static_dimension_list   : (decimal_literal "x")+
-dimension_list_ranked   : (dimension "x")*
-dimension_list_unranked : "*" "x"
-dimension_list : dimension_list_ranked | dimension_list_unranked
+// Identifier syntax - rules for naming things in MLIR
+bare_id     : (letter| underscore) (letter|digit|underscore|id_chars)*         // Basic identifier like variable_name
+suffix_id   : digits | ((letter | id_punct) (letter | id_punct | digits)*)     // Suffix part of identifiers
+
+// Dimensions for tensor/vector types
+dimension                : "?" | decimal_literal                               // A dimension can be dynamic (?) or a static size
+static_dimension_list    : (decimal_literal "x")+                              // List of static dimensions like 2x3x4
+dimension_list_ranked    : (dimension "x")*                                    // Dimensions for ranked tensors/memrefs like 2x?x4
+dimension_list_unranked  : "*" "x"                                             // Marker for unranked tensors/memrefs
+dimension_list           : dimension_list_ranked | dimension_list_unranked     // Any dimension list
 
 // ----------------------------------------------------------------------
-// Identifiers
+// Identifiers - different kinds of named references in MLIR
 
-ssa_id        : "%" suffix_id ("#" digits)?
-symbol_ref_id : "@" (suffix_id | string_literal)
-block_id      : "^" suffix_id
-type_alias     : "!" (string_literal | bare_id)
-map_or_set_id : "#" suffix_id
-attribute_alias : "#" (string_literal | bare_id)
+ssa_id           : "%" suffix_id ("#" digits)?                                 // SSA value identifiers like %value or %42
+symbol_ref_id    : "@" (suffix_id | string_literal)                            // Symbol references like @function or @"func.with.dots"
+block_id         : "^" suffix_id                                               // Block label identifiers like ^bb0
+type_alias       : "!" (string_literal | bare_id)                              // Type aliases like !mydialect
+map_or_set_id    : "#" suffix_id                                               // Map or set identifiers like #map0
+attribute_alias  : "#" (string_literal | bare_id)                              // Attribute aliases like #attr0
 
-ssa_id_list : ssa_id ("," ssa_id)*
+ssa_id_list      : ssa_id ("," ssa_id)*                                        // List of SSA values like %a, %b, %c
 
 // Uses of an SSA value, e.g., in an operand list to an operation.
-ssa_use : ssa_id | constant_literal
-ssa_use_list : ssa_use ("," ssa_use)*
+ssa_use          : ssa_id | constant_literal                                   // An SSA value or constant like %x or 42
+ssa_use_list     : ssa_use ("," ssa_use)*                                      // List of SSA uses like %x, 42, %y
 
 // ----------------------------------------------------------------------
-// Types
+// Types - MLIR's type system definitions
 
 // Standard types
-none_type : "none"
-!float_type : "f16" | "bf16" | "f32" | "f64"
-index_type : "index"
-inttype_width: /[1-9][0-9]*/  // Sized integers like i1, i4, i8, i16, i32.
-signed_integer_type : "si" inttype_width
-unsigned_integer_type : "ui" inttype_width
-signless_integer_type : "i" inttype_width
-integer_type : signed_integer_type | unsigned_integer_type | signless_integer_type
-complex_type : "complex" "<" type ">"
-tuple_type : "tuple" "<" type_list_no_parens ">"
+none_type             : "none"                                                  // None type (similar to void)
+float_type            : "f16" | "bf16" | "f32" | "f64"                          // Floating point types with different precisions
+index_type            : "index"                                                 // Index type (for loop induction variables, etc.)
+inttype_width         : /[1-9][0-9]*/                                           // Width for integer types (must be > 0)
+signed_integer_type   : "si" inttype_width                                      // Signed integers like si32
+unsigned_integer_type : "ui" inttype_width                                      // Unsigned integers like ui32
+signless_integer_type : "i" inttype_width                                       // Signless integers like i32
+integer_type          : signed_integer_type | unsigned_integer_type | signless_integer_type  // Any integer type
+complex_type          : "complex" "<" type ">"                                  // Complex number type like complex<f32>
+tuple_type            : "tuple" "<" type_list_no_parens ">"                     // Tuple type like tuple<i32, f32>
 
-// Vector types
-vector_element_type : float_type | integer_type
-vector_type : "vector" "<" static_dimension_list vector_element_type ">"
+// Vector types - represent SIMD-like data
+vector_element_type   : float_type | integer_type                               // Types allowed as vector elements
+vector_type           : "vector" "<" static_dimension_list vector_element_type ">"  // Vector type like vector<4xi32>
 
-// Tensor type
-tensor_memref_element_type : vector_element_type | vector_type | complex_type | type_alias
-ranked_tensor_type : "tensor" "<" dimension_list_ranked tensor_memref_element_type ">"
-unranked_tensor_type : "tensor" "<" dimension_list_unranked tensor_memref_element_type ">"
-tensor_type : ranked_tensor_type | unranked_tensor_type
+// Tensor type - multi-dimensional arrays
+tensor_memref_element_type  : vector_element_type | vector_type | complex_type | type_alias  // Valid tensor elements
+ranked_tensor_type          : "tensor" "<" dimension_list_ranked tensor_memref_element_type ">"      // Ranked tensor like tensor<2x3xf32>
+unranked_tensor_type        : "tensor" "<" dimension_list_unranked tensor_memref_element_type ">"    // Unranked tensor like tensor<*xf32>
+tensor_type                 : ranked_tensor_type | unranked_tensor_type                              // Any tensor type
 
-// Memref type
-stride_list : "[" (dimension ("," dimension)*)? "]"
-strided_layout : "strided" "<" stride_list ("," "offset:" dimension)? ">"
-?layout_specification : semi_affine_map | strided_layout
-?memory_space : integer_literal // | TODO(mlir): address_space_id
-ranked_memref_type : "memref" "<" dimension_list_ranked tensor_memref_element_type  optional_layout_specification optional_memory_space ">"
-unranked_memref_type : "memref" "<*x" tensor_memref_element_type optional_memory_space ">"
-memref_type : ranked_memref_type | unranked_memref_type
+// Memref type - represents buffer references with layout
+stride_list           : "[" (dimension ("," dimension)*)? "]"                  // Strides for memory layout
+strided_layout        : "strided" "<" stride_list ("," "offset:" dimension)? ">"  // Layout with strides and offset
+?layout_specification : semi_affine_map | strided_layout                       // Ways to specify memory layout
+?memory_space         : integer_literal                                        // Memory space identifier
+ranked_memref_type    : "memref" "<" dimension_list_ranked tensor_memref_element_type optional_layout_specification optional_memory_space ">"  // Ranked memref
+unranked_memref_type  : "memref" "<*x" tensor_memref_element_type optional_memory_space ">"  // Unranked memref
+memref_type           : ranked_memref_type | unranked_memref_type             // Any memref type
 
-// Dialect types - these can be opaque, pretty, or using custom dialects
-opaque_dialect_item : bare_id "<" string_literal ">"
-pretty_dialect_item : bare_id "." bare_id pretty_dialect_item_body?
-pretty_dialect_item_body : "<" pretty_dialect_item_contents ("," pretty_dialect_item_contents)* ">"
-?pretty_dialect_item_contents : ("(" pretty_dialect_item_contents ")")
-                              | ("[" pretty_dialect_item_contents "]")
-                              | ("{" pretty_dialect_item_contents "}")
-                              | bare_id
-                              | constant_literal
-                              | type
+// Dialect types - types defined by custom dialects
+opaque_dialect_item        : bare_id "<" string_literal ">"                     // Opaque dialect item like mydialect<"opaque">
+pretty_dialect_item        : bare_id "." bare_id pretty_dialect_item_body?      // Pretty syntax like mydialect.type<...>
+pretty_dialect_item_body   : "<" pretty_dialect_item_contents ("," pretty_dialect_item_contents)* ">"  // Body of pretty dialect item
+?pretty_dialect_item_contents : ("(" pretty_dialect_item_contents ")")          // Nested parentheses in dialect items
+                            | ("[" pretty_dialect_item_contents "]")            // Nested brackets in dialect items
+                            | ("{" pretty_dialect_item_contents "}")            // Nested braces in dialect items
+                            | bare_id                                           // Identifiers in dialect items
+                            | constant_literal                                  // Constants in dialect items
+                            | type                                              // Types in dialect items
 
-// NOTE: "pymlir_dialect_types" is defined externally by pyMLIR
-dialect_type : "!" (pymlir_dialect_types | opaque_dialect_item | pretty_dialect_item)
+// pymlir_dialect_types is injected by pyMLIR at runtime
+dialect_type              : "!" (pymlir_dialect_types | opaque_dialect_item | pretty_dialect_item)  // Any dialect-specific type
 
-// Final type definition
-standard_type     : complex_type | float_type | function_type | llvm_function_type | index_type | integer_type | memref_type | none_type | tensor_type | tuple_type | vector_type
-non_function_type : type_alias | complex_type | float_type | index_type | integer_type | memref_type | none_type | tensor_type | tuple_type | vector_type | dialect_type
-type              : type_alias | dialect_type | standard_type
+// Final type definition - the complete type system
+standard_type             : complex_type | float_type | function_type | llvm_function_type | index_type | integer_type | memref_type | none_type | tensor_type | tuple_type | vector_type  // Built-in types
+non_function_type         : type_alias | complex_type | float_type | index_type | integer_type | memref_type | none_type | tensor_type | tuple_type | vector_type | dialect_type  // Types except functions
+type                      : type_alias | dialect_type | standard_type           // Any type in the system
 
-// Uses of types
-type_list_no_parens :  type ("," type)*
-type_list_parens : ("(" ")") | ("(" type_list_no_parens ")")
-function_result_type : type_list_parens | type_list_no_parens | non_function_type
-function_type : function_result_type ("->" | "to" | "into") function_result_type
-llvm_function_type : type type_list_parens
-ssa_use_and_type : ssa_use ":" type
-ssa_use_and_type_list : ssa_use_and_type ("," ssa_use_and_type)*
+// Uses of types in various contexts
+type_list_no_parens       : type ("," type)*                                   // List of types without parentheses
+type_list_parens          : ("(" ")") | ("(" type_list_no_parens ")")          // Parenthesized list of types
+function_result_type      : type_list_parens | type_list_no_parens | non_function_type  // Return type(s) of a function
+function_type             : function_result_type ("->" | "to" | "into") function_result_type  // Function type like (i32, f32) -> i32
+llvm_function_type        : type type_list_parens                              // LLVM-style function type
+ssa_use_and_type          : ssa_use ":" type                                   // SSA value with its type like %x : i32
+ssa_use_and_type_list     : ssa_use_and_type ("," ssa_use_and_type)*           // List of typed SSA values
 
 // ----------------------------------------------------------------------
-// Attributes
+// Attributes - compile-time known values attached to operations
 
 // Simple attribute types
-array_attribute : "[" (attribute_value ("," attribute_value)*)? "]"
-bool_attribute : bool_literal
-dictionary_attribute : "{" (attribute_entry ("," attribute_entry)*)? "}"
-?elements_attribute : dense_elements_attribute | opaque_elements_attribute | sparse_elements_attribute
-float_attribute : (float_literal optional_float_type) | (hexadecimal_literal ":" float_type)
-integer_attribute : posneg_integer_literal optional_int_type
-integer_set_attribute : affine_map
-string_attribute : string_literal optional_type
-symbol_ref_attribute : (symbol_ref_id ("::" symbol_ref_id)*)
-type_attribute : type
-unit_attribute : "unit"
+array_attribute           : "[" (attribute_value ("," attribute_value)*)? "]"  // Array of attributes like [1, 2, 3]
+bool_attribute            : bool_literal                                       // Boolean attribute (true/false)
+dictionary_attribute      : "{" (attribute_entry ("," attribute_entry)*)? "}"  // Dict of attributes like {a = 1, b = 2}
+?elements_attribute       : dense_elements_attribute | opaque_elements_attribute | sparse_elements_attribute  // For tensor constants
+float_attribute           : (float_literal optional_float_type) | (hexadecimal_literal ":" float_type)  // Float attr like 3.14 : f32
+integer_attribute         : posneg_integer_literal optional_int_type           // Integer attr like 42 : i32
+integer_set_attribute     : affine_map                                         // Affine constraint set
+string_attribute          : string_literal optional_type                       // String attr like "hello" : !mydialect.string
+symbol_ref_attribute      : (symbol_ref_id ("::" symbol_ref_id)*)              // Symbol reference like @func::@inner
+type_attribute            : type                                               // Type used as an attribute
+unit_attribute            : "unit"                                             // Unit attribute (presence-only)
 
-
-// Elements attribute types
-dense_elements_attribute : "dense" "<" attribute_value ">" ":" ( tensor_type | vector_type )
-opaque_elements_attribute : "opaque" "<" bare_id  "," hexadecimal_literal ">" ":" ( tensor_type | vector_type )
-sparse_elements_attribute : "sparse" "<" attribute_value "," attribute_value ">" ":" ( tensor_type | vector_type )
+// Elements attribute types - for tensor/vector constants
+dense_elements_attribute   : "dense" "<" attribute_value ">" ":" ( tensor_type | vector_type )  // Dense tensor like dense<[1,2,3]> : tensor<3xi32>
+opaque_elements_attribute  : "opaque" "<" bare_id  "," hexadecimal_literal ">" ":" ( tensor_type | vector_type )  // Opaque tensor data
+sparse_elements_attribute  : "sparse" "<" attribute_value "," attribute_value ">" ":" ( tensor_type | vector_type )  // Sparse tensor
 
 // Standard attributes
-standard_attribute : array_attribute | bool_attribute | dictionary_attribute | elements_attribute | float_attribute | integer_attribute | integer_set_attribute | string_attribute | symbol_ref_attribute | type_attribute | unit_attribute
+standard_attribute        : array_attribute | bool_attribute | dictionary_attribute | elements_attribute | float_attribute | integer_attribute | integer_set_attribute | string_attribute | symbol_ref_attribute | type_attribute | unit_attribute  // Any standard attribute
 
 // Attribute values
-attribute_value : attribute_alias | dialect_attribute | standard_attribute
-dependent_attribute_entry : bare_id "=" attribute_value
-dialect_attribute_entry : (bare_id "." bare_id) | (bare_id "." bare_id "=" attribute_value)
+attribute_value           : attribute_alias | dialect_attribute | standard_attribute  // Any attribute value
+dependent_attribute_entry : bare_id "=" attribute_value                        // Named attribute like value = 42
+dialect_attribute_entry   : (bare_id "." bare_id) | (bare_id "." bare_id "=" attribute_value)  // Dialect attribute like dialect.attr = value
 
 // Dialect attributes
-// NOTE: "pymlir_dialect_types" is defined externally by pyMLIR
-dialect_attribute : "#" (pymlir_dialect_types | opaque_dialect_item | pretty_dialect_item)
+// pymlir_dialect_types is injected by pyMLIR at runtime
+dialect_attribute         : "#" (pymlir_dialect_types | opaque_dialect_item | pretty_dialect_item)  // Dialect-specific attribute
 
 // Attribute dictionaries
-attribute_entry : dialect_attribute_entry | dependent_attribute_entry
-attribute_dict : ("{" "}") | ("{" attribute_entry ("," attribute_entry)* "}")
+attribute_entry           : dialect_attribute_entry | dependent_attribute_entry  // Entry in attribute dictionary
+attribute_dict            : ("{" "}") | ("{" attribute_entry ("," attribute_entry)* "}")  // Full attribute dictionary
 
 // ----------------------------------------------------------------------
-// Operations
+// Operations - the core computational units in MLIR
 
 // Types that appear after the operation, indicating return types
-trailing_type     : ":" (function_type | function_result_type)
+trailing_type             : ":" (function_type | function_result_type)         // Types after an operation like : i32
 
 // Operation results
-op_result         : ssa_id optional_int_literal
-op_result_list    : op_result ("," op_result)* "="
+op_result                 : ssa_id optional_int_literal                        // Operation result with optional index like %0:2
+op_result_list            : op_result ("," op_result)* "="                     // List of results like %a, %b =
 
 // Trailing location (for debug information)
-location : string_literal ":" decimal_literal ":" decimal_literal
-trailing_location : ("loc" "(" location ")")
+location                  : string_literal ":" decimal_literal ":" decimal_literal  // Source location like "file.mlir":10:25
+trailing_location         : ("loc" "(" location ")")                           // Location attached to operation
 
 // Undefined operations in all dialects
-generic_operation : string_literal "(" optional_ssa_use_list ")" optional_successor_list optional_region_list optional_attr_dict trailing_type
-custom_operation  : bare_id "." bare_id optional_ssa_use_list trailing_type
+generic_operation         : string_literal "(" optional_ssa_use_list ")" optional_successor_list optional_region_list optional_attr_dict trailing_type  // Generic syntax like "dialect.op"(%a, %b)
+custom_operation          : bare_id "." bare_id optional_ssa_use_list trailing_type  // Custom operation like mydialect.op
 
 // Final operation definition
-// NOTE: "pymlir_dialect_ops" is defined externally by pyMLIR
-operation         : optional_op_result_list (pymlir_dialect_ops | custom_operation | generic_operation | module | generic_module | function) optional_trailing_loc
+// pymlir_dialect_ops is injected by pyMLIR at runtime
+operation                 : optional_op_result_list (pymlir_dialect_ops | custom_operation | generic_operation | module | generic_module | function) optional_trailing_loc  // Any operation
 
 // ----------------------------------------------------------------------
-// Blocks and regions
+// Blocks and regions - control flow structure
 
 // Block arguments
-ssa_id_and_type : ssa_id ":" type
-ssa_id_and_type_list : ssa_id_and_type ("," ssa_id_and_type)*
-?block_arg_list : "(" optional_ssa_and_type_list ")"
-operation_list: operation+
+ssa_id_and_type           : ssa_id ":" type                                    // Typed SSA value like %arg0 : i32
+ssa_id_and_type_list      : ssa_id_and_type ("," ssa_id_and_type)*             // List of typed SSA values
+?block_arg_list           : "(" optional_ssa_and_type_list ")"                 // Block arguments like (%arg0: i32, %arg1: f32)
+operation_list            : operation+                                         // One or more operations
 
-block_label     : block_id optional_block_arg_list ":"
-successor_list   : "[" block_id? ("," block_id)* "]"
+block_label               : block_id optional_block_arg_list ":"               // Block label like ^bb0(%arg0: i32):
+successor_list            : "[" block_id? ("," block_id)* "]"                  // List of successor blocks like [^bb1, ^bb2]
 
-block           : optional_block_label operation_list
-region : "{" block* "}"
-region_list : "(" region? ("," region)* ")"
+block                     : optional_block_label operation_list                // A block of operations with optional label
+region                    : "{" block* "}"                                     // A region containing blocks
+region_list               : "(" region? ("," region)* ")"                      // List of regions
 
 // ---------------------------------------------------------------------
-// Optional types
+// Optional types - these rules make various parts of the syntax optional
+// Each rule creates a version where the item is optional
 ?optional_symbol_ref_id                 : symbol_ref_id?                       -> optional
 ?optional_func_mod_attrs                : ("attributes" attribute_dict)?       -> optional
 ?optional_arg_list                      : argument_list?                       -> optional
@@ -215,125 +238,131 @@ region_list : "(" region? ("," region)* ")"
 ?optional_symbol_use_list               : symbol_use_list?                     -> optional
 ?optional_successor_list                : successor_list?                      -> optional
 ?optional_region_list                   : region_list?                         -> optional
+
 // ----------------------------------------------------------------------
-// Modules and functions
+// Modules and functions - top-level containers
 
 // Arguments
-named_argument : ssa_id ":" type optional_attr_dict
-argument_list : (named_argument ("," named_argument)*) | (type optional_attr_dict ("," type optional_attr_dict)*)
-argument_assignment : ssa_id "=" ssa_id
-argument_assignment_list_no_parens : argument_assignment ("," argument_assignment)*
-argument_assignment_list_parens : ("(" ")") | ("(" argument_assignment_list_no_parens ")")
+named_argument                  : ssa_id ":" type optional_attr_dict           // Named function argument like %arg0 : i32 {attr = value}
+argument_list                   : (named_argument ("," named_argument)*) | (type optional_attr_dict ("," type optional_attr_dict)*)  // Function arguments
+argument_assignment             : ssa_id "=" ssa_id                            // Argument assignment like %a = %b
+argument_assignment_list_no_parens : argument_assignment ("," argument_assignment)*  // List of assignments
+argument_assignment_list_parens : ("(" ")") | ("(" argument_assignment_list_no_parens ")")  // Parenthesized assignments
 
 // Return values
-function_result : type optional_attr_dict
-function_result_list_no_parens : function_result ("," function_result)*
-function_result_list_parens : ("(" ")") | ("(" function_result_list_no_parens ")")
-?function_result_list : function_result_list_parens | non_function_type
+function_result                 : type optional_attr_dict                      // Function result type with attributes
+function_result_list_no_parens  : function_result ("," function_result)*       // Multiple results
+function_result_list_parens     : ("(" ")") | ("(" function_result_list_no_parens ")")  // Parenthesized results
+?function_result_list           : function_result_list_parens | non_function_type  // Any result list
 
 // Body
-?function_body : region
+?function_body                  : region                                       // The function body is a region
 
 // Definition
-module : "module" optional_symbol_ref_id optional_func_mod_attrs region optional_trailing_loc
-function : "func.func" symbol_ref_id "(" optional_arg_list ")" optional_fn_result_list optional_func_mod_attrs optional_fn_body optional_trailing_loc
-generic_module : string_literal "(" optional_arg_list ")" "(" region ")" optional_attr_dict trailing_type optional_trailing_loc
+module                          : "module" optional_symbol_ref_id optional_func_mod_attrs region optional_trailing_loc  // Module definition
+function                        : "func.func" symbol_ref_id "(" optional_arg_list ")" optional_fn_result_list optional_func_mod_attrs optional_fn_body optional_trailing_loc  // Function definition
+generic_module                  : string_literal "(" optional_arg_list ")" "(" region ")" optional_attr_dict trailing_type optional_trailing_loc  // Generic module
 
 // ----------------------------------------------------------------------
-// (semi-)affine expressions, maps, and integer sets
+// (semi-)affine expressions, maps, and integer sets - for polyhedral optimization
 
-dim_id_list : "(" bare_id? ("," bare_id)* ")"
-symbol_id_list: "[" bare_id? ("," bare_id)* "]"
-dim_and_symbol_id_lists : dim_id_list optional_symbol_id_list
-?symbol_or_const : posneg_integer_literal | ssa_id | bare_id
+dim_id_list                     : "(" bare_id? ("," bare_id)* ")"              // List of dimension identifiers
+symbol_id_list                  : "[" bare_id? ("," bare_id)* "]"              // List of symbol identifiers
+dim_and_symbol_id_lists         : dim_id_list optional_symbol_id_list          // Combined dimension and symbol lists
+?symbol_or_const                : posneg_integer_literal | ssa_id | bare_id    // Symbol or constant value
 
-?dim_use_list    : "(" ssa_use_list? ")"
-?symbol_use_list : "[" ssa_use_list? "]"
-dim_and_symbol_use_list : dim_use_list optional_symbol_use_list
+?dim_use_list                   : "(" ssa_use_list? ")"                        // List of dimension uses
+?symbol_use_list                : "[" ssa_use_list? "]"                        // List of symbol uses
+dim_and_symbol_use_list         : dim_use_list optional_symbol_use_list        // Combined dimension and symbol uses
 
-affine_expr : "(" affine_expr ")"                      -> affine_parens
-            | affine_expr "+" affine_expr              -> affine_add
-            | affine_expr "-" affine_expr              -> affine_sub
-            | posneg_integer_literal "*" affine_expr   -> affine_mul
-            | affine_expr "*" posneg_integer_literal   -> affine_mul
-            | affine_expr "&ceildiv&" integer_literal  -> affine_ceildiv
-            | affine_expr "&floordiv&" integer_literal -> affine_floordiv
-            | affine_expr "&mod&" integer_literal      -> affine_mod
-            | "-" affine_expr                          -> affine_neg
-            | "symbol" "(" ssa_id ")"                  -> affine_symbol_explicit
-            | posneg_integer_literal                   -> affine_literal
-            | ssa_id                                   -> affine_ssa
-            | bare_id                                  -> affine_dim_or_symbol
+// Affine expressions - polynomial expressions with dimensions and symbols
+affine_expr : "(" affine_expr ")"                      -> affine_parens        // Parenthesized expression
+            | affine_expr "+" affine_expr              -> affine_add           // Addition
+            | affine_expr "-" affine_expr              -> affine_sub           // Subtraction
+            | posneg_integer_literal "*" affine_expr   -> affine_mul           // Multiplication (constant * expr)
+            | affine_expr "*" posneg_integer_literal   -> affine_mul           // Multiplication (expr * constant)
+            | affine_expr "&ceildiv&" integer_literal  -> affine_ceildiv       // Ceiling division
+            | affine_expr "&floordiv&" integer_literal -> affine_floordiv      // Floor division
+            | affine_expr "&mod&" integer_literal      -> affine_mod           // Modulo
+            | "-" affine_expr                          -> affine_neg           // Negation
+            | "symbol" "(" ssa_id ")"                  -> affine_symbol_explicit  // Explicit symbol
+            | posneg_integer_literal                   -> affine_literal       // Literal value
+            | ssa_id                                   -> affine_ssa           // SSA value
+            | bare_id                                  -> affine_dim_or_symbol // Dimension or symbol identifier
 
-semi_affine_expr : "(" semi_affine_expr ")"                        -> semi_affine_parens
-                 | semi_affine_expr "+" semi_affine_expr           -> semi_affine_add
-                 | semi_affine_expr "-" semi_affine_expr           -> semi_affine_sub
-                 | symbol_or_const "*" semi_affine_expr            -> semi_affine_mul
-                 | semi_affine_expr "*" symbol_or_const            -> semi_affine_mul
-                 | semi_affine_expr "&ceildiv&" semi_affine_oprnd  -> semi_affine_ceildiv
-                 | semi_affine_expr "&floordiv&" semi_affine_oprnd -> semi_affine_floordiv
-                 | semi_affine_expr "&mod&" semi_affine_oprnd      -> semi_affine_mod
-                 | "symbol" "(" symbol_or_const ")"                -> semi_affine_symbol_explicit
-                 | symbol_or_const                                 -> semi_affine_symbol
+// Semi-affine expressions - allow more flexibility than strict affine expressions
+semi_affine_expr : "(" semi_affine_expr ")"                        -> semi_affine_parens    // Parenthesized expression
+                 | semi_affine_expr "+" semi_affine_expr           -> semi_affine_add       // Addition
+                 | semi_affine_expr "-" semi_affine_expr           -> semi_affine_sub       // Subtraction
+                 | symbol_or_const "*" semi_affine_expr            -> semi_affine_mul       // Multiplication (const * expr)
+                 | semi_affine_expr "*" symbol_or_const            -> semi_affine_mul       // Multiplication (expr * const)
+                 | semi_affine_expr "&ceildiv&" semi_affine_oprnd  -> semi_affine_ceildiv   // Ceiling division
+                 | semi_affine_expr "&floordiv&" semi_affine_oprnd -> semi_affine_floordiv  // Floor division
+                 | semi_affine_expr "&mod&" semi_affine_oprnd      -> semi_affine_mod       // Modulo
+                 | "symbol" "(" symbol_or_const ")"                -> semi_affine_symbol_explicit  // Explicit symbol
+                 | symbol_or_const                                 -> semi_affine_symbol    // Symbol or constant
 
 // Second operand for floordiv/ceildiv/mod in semi-affine expressions
 ?semi_affine_oprnd : symbol_or_const
-                   | "(" semi_affine_expr ")" -> semi_affine_parens
+                   | "(" semi_affine_expr ")" -> semi_affine_parens            // Can be more complex in semi-affine
 
-?multi_dim_affine_expr_no_parens : affine_expr ("," affine_expr)*
-?multi_dim_semi_affine_expr_no_parens : semi_affine_expr ("," semi_affine_expr)*
-multi_dim_affine_expr : "(" multi_dim_affine_expr_no_parens ")"
-multi_dim_semi_affine_expr : "(" multi_dim_semi_affine_expr_no_parens ")"
-affine_constraint : affine_expr ">=" "0"    -> affine_constraint_ge
-                  | affine_expr "==" "0"    -> affine_constraint_eq
-affine_constraint_conjunction : affine_constraint ("," affine_constraint)*
+?multi_dim_affine_expr_no_parens      : affine_expr ("," affine_expr)*         // Multiple affine expressions
+?multi_dim_semi_affine_expr_no_parens : semi_affine_expr ("," semi_affine_expr)*  // Multiple semi-affine expressions
+multi_dim_affine_expr                 : "(" multi_dim_affine_expr_no_parens ")"  // Parenthesized multi-dimensional affine expr
+multi_dim_semi_affine_expr            : "(" multi_dim_semi_affine_expr_no_parens ")"  // Parenthesized multi-dim semi-affine
 
-affine_map_inline      : "affine_map" "<" dim_and_symbol_id_lists "->" multi_dim_affine_expr ">"
-semi_affine_map_inline : dim_and_symbol_id_lists "->" multi_dim_semi_affine_expr
-integer_set_inline     : dim_and_symbol_id_lists ":" "(" optional_affine_constraint_conjunction ")"
+affine_constraint : affine_expr ">=" "0"    -> affine_constraint_ge            // Greater-than-or-equal constraint
+                  | affine_expr "==" "0"    -> affine_constraint_eq            // Equality constraint
+affine_constraint_conjunction : affine_constraint ("," affine_constraint)*     // Multiple constraints joined by AND
 
-// Definition of maps and sets
-affine_map      : map_or_set_id | affine_map_inline
-semi_affine_map : map_or_set_id | semi_affine_map_inline
-integer_set     : map_or_set_id | integer_set_inline
+// Inline definitions of maps and sets
+affine_map_inline      : "affine_map" "<" dim_and_symbol_id_lists "->" multi_dim_affine_expr ">"  // Affine map
+semi_affine_map_inline : dim_and_symbol_id_lists "->" multi_dim_semi_affine_expr  // Semi-affine map
+integer_set_inline     : dim_and_symbol_id_lists ":" "(" optional_affine_constraint_conjunction ")"  // Integer set
 
-affine_map_list : affine_map ("," affine_map)*
+// Definition of maps and sets - can be referenced by ID or defined inline
+affine_map             : map_or_set_id | affine_map_inline                     // Affine map (by ID or inline)
+semi_affine_map        : map_or_set_id | semi_affine_map_inline                // Semi-affine map
+integer_set            : map_or_set_id | integer_set_inline                    // Integer set
+
+affine_map_list        : affine_map ("," affine_map)*                          // List of affine maps
 
 // ----------------------------------------------------------------------
 // General structure and top-level definitions
 
 // Definitions of affine maps/integer sets/aliases are at the top of the file
-type_alias_def : type_alias "=" "type" type
-affine_map_def      : map_or_set_id "=" affine_map_inline
-semi_affine_map_def : map_or_set_id "=" semi_affine_map_inline
-integer_set_def     : map_or_set_id "=" integer_set_inline
-attribute_alias_def : attribute_alias "=" attribute_value
-?definition : type_alias_def | affine_map_def | semi_affine_map_def | integer_set_def | attribute_alias_def
-
+type_alias_def         : type_alias "=" "type" type                            // Type alias definition like !mytype = type i32
+affine_map_def         : map_or_set_id "=" affine_map_inline                   // Affine map definition
+semi_affine_map_def    : map_or_set_id "=" semi_affine_map_inline              // Semi-affine map definition
+integer_set_def        : map_or_set_id "=" integer_set_inline                  // Integer set definition
+attribute_alias_def    : attribute_alias "=" attribute_value                   // Attribute alias definition
+?definition            : type_alias_def | affine_map_def | semi_affine_map_def | integer_set_def | attribute_alias_def  // Any top-level definition
 
 // ----------------------------------------------------------------------
 // Structure of an MLIR parse-able string
 
-definition_list              : definition*
-function_list                : function*
-module_list                  : (module | generic_module)*
-definition_and_function_list : definition_list function_list
-definition_and_module_list   : definition_list module_list
+definition_list              : definition*                                      // List of definitions
+function_list                : function*                                        // List of functions
+module_list                  : (module | generic_module)*                       // List of modules
+definition_and_function_list : definition_list function_list                    // Definitions followed by functions
+definition_and_module_list   : definition_list module_list                      // Definitions followed by modules
 
-mlir_file: definition_and_function_list*       -> only_functions_and_definitions_file
-         | definition_and_module_list*         -> mlir_file_as_definition_and_module_list
+// The overall file can contain either standalone functions or modules
+mlir_file: definition_and_function_list*       -> only_functions_and_definitions_file  // File with functions
+         | definition_and_module_list*         -> mlir_file_as_definition_and_module_list  // File with modules
 
-
+// The start rule for the parser
 ?start: mlir_file
 
-// Lark imports
-%import common.ESCAPED_STRING
-%import common.SIGNED_NUMBER
-%import common.WS
-%import common.NEWLINE
+// Lark imports - these import common patterns from the Lark library
+%import common.ESCAPED_STRING    // For string literals with escapes like "\n"
+%import common.SIGNED_NUMBER     // For signed numbers
+%import common.WS                // For whitespace
+%import common.NEWLINE           // For newlines
 
-// Things to ignore: whitespace, single-line comments
-%ignore WS
+// Things to ignore during parsing
+%ignore WS                       // Ignore whitespace
 
-COMMENT : "//" /(.)*/ NEWLINE
-%ignore COMMENT
+// Comment syntax and handling
+COMMENT : "//" /(.)*/ NEWLINE    // Single-line comments
+%ignore COMMENT                  // Ignore comments during parsing
