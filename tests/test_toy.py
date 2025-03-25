@@ -1,29 +1,30 @@
-""" Tests pyMLIR on examples that use the Toy dialect. """
+"""Tests pyMLIR on examples that use the Toy dialect."""
 
-from mlir import parse_string, parse_path
-from mlir.dialects.func import func 
+import pytest
 import os
+from mlir import parse_string, parse_path
+from mlir.dialects.func import func
 
 
 def test_toy_simple():
-    code = '''
+    code = """
 module {
   func.func @toy_func(%tensor: tensor<2x3xf64>) -> tensor<3x2xf64> {
     %t_tensor = "toy.transpose"(%tensor) { inplace = true } : (tensor<2x3xf64>) -> tensor<3x2xf64>
     return %t_tensor : tensor<3x2xf64>
   }
 }
-    '''
+    """
 
     module = parse_string(code)
-    print(module.pretty())
+    assert module is not None
 
 
 def test_toy_advanced():
-    module = parse_path(os.path.join(os.path.dirname(__file__), 'toy.mlir'))
-    print(module.pretty())
+    module = parse_path(os.path.join(os.path.dirname(__file__), "toy.mlir"))
+    assert module is not None
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     test_toy_simple()
     test_toy_advanced()

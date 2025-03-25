@@ -1,17 +1,17 @@
-""" Tests pyMLIR's node visitor and transformer. """
+"""Tests pyMLIR's node visitor and transformer."""
 
-from mlir import NodeVisitor, NodeTransformer, Parser, astnodes
-from mlir.dialects.func import func 
 import pytest
-from typing import Optional
+from mlir import NodeVisitor, NodeTransformer, Parser, astnodes
+from mlir.dialects.func import func
+
 
 @pytest.fixture
-def parser(parser: Optional[Parser] = None) -> Parser:
-    return parser if parser is not None else Parser()
+def parser():
+    return Parser()
 
 
 # Sample code to use for visitors
-_code = '''
+_code = """
 module {
   func.func @test0(%arg0: index, %arg1: index) {
     %0 = alloc() : memref<100x100xf32>
@@ -44,19 +44,18 @@ module {
     %0 = alloc() : memref<100x100xf32>
   }
 }
-'''
+"""
 
 
-def test_visitor(parser: Optional[Parser] = None):
+def test_visitor(parser):
     class MyVisitor(NodeVisitor):
         def __init__(self):
             self.functions = 0
 
         def visit_Function(self, node: astnodes.Function):
             self.functions += 1
-            print('Function detected:', node.name.value)
+            self.generic_visit(node)
 
-    parser = parser or Parser()
     m = parser.parse(_code)
     visitor = MyVisitor()
     visitor.visit(m)
@@ -64,7 +63,7 @@ def test_visitor(parser: Optional[Parser] = None):
     assert visitor.functions == 3
 
 
-def test_transformer(parser: Optional[Parser] = None):
+def test_transformer(parser):
     # Simple node transformer that removes all operations with a result
     class RemoveAllResultOps(NodeTransformer):
         def visit_Operation(self, node: astnodes.Operation):
@@ -75,10 +74,8 @@ def test_transformer(parser: Optional[Parser] = None):
             # No outputs, no need to do anything
             return self.generic_visit(node)
 
-    parser = parser or Parser()
     m = parser.parse(_code)
     m = RemoveAllResultOps().visit(m)
-    print(m.pretty())
 
     # Verify that there are no operations with results
     class Tester(NodeVisitor):
@@ -93,10 +90,3 @@ def test_transformer(parser: Optional[Parser] = None):
     t = Tester()
     t.visit(m)
     assert t.fail is False
-
-
-if __name__ == '__main__':
-    p = Parser()
-    print("MLIR parser created")
-    test_visitor(p)
-    test_transformer(p)

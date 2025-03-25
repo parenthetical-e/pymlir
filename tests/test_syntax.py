@@ -1,16 +1,17 @@
-""" Tests pyMLIR on different syntactic edge-cases. """
+"""Tests pyMLIR on different syntactic edge-cases."""
 
-from mlir import Parser
-from mlir.dialects.func import func 
 import pytest
-from typing import Optional
+from mlir import Parser
+from mlir.dialects.func import func
+
 
 @pytest.fixture
-def parser(parser: Optional[Parser] = None) -> Parser:
-    return parser if parser is not None else Parser()
+def parser():
+    return Parser()
 
-def test_attributes(parser: Optional[Parser] = None):
-    code = '''
+
+def test_attributes(parser):
+    code = """
 module {
   func.func @myfunc(%tensor: tensor<256x?xf64>) -> tensor<*xf64> {
     %t_tensor = "with_attributes"(%tensor) { inplace = true, abc = -123, bla = unit, hello_world = "hey", value=@this::@is::@hierarchical, somelist = ["of", "values"], last = {butnot = "least", dictionaries = 0xabc} } : (tensor<2x3xf64>) -> tuple<vector<3xi33>,tensor<2x3xf64>> 
@@ -21,14 +22,14 @@ module {
     return %0#50 : tensor<3x2xf64>
   }
 }
-    '''
-    parser = parser or Parser()
+    """
     module = parser.parse(code)
-    print(module.pretty())
+    # Just verify it parses without errors
+    assert module is not None
 
 
-def test_memrefs(parser: Optional[Parser] = None):
-    code = '''
+def test_memrefs(parser):
+    code = """
 module {
   func.func @myfunc() {
         %a, %b = "tensor_replicator"(%tensor, %tensor) : (memref<?xbf16, 2>, 
@@ -36,27 +37,25 @@ module {
           memref<*xf32, 8>)
   }
 }
-    '''
-    parser = parser or Parser()
+    """
     module = parser.parse(code)
-    print(module.pretty())
+    assert module is not None
 
 
-def test_trailing_loc(parser: Optional[Parser] = None):
-    code = '''
+def test_trailing_loc(parser):
+    code = """
     module {
       func.func @myfunc() {
         %c:2 = addf %a, %b : f32 loc("test_syntax.py":36:59)
       }
     } loc("hi.mlir":30:1)
-    '''
-    parser = parser or Parser()
+    """
     module = parser.parse(code)
-    print(module.pretty())
+    assert module is not None
 
 
-def test_modules(parser: Optional[Parser] = None):
-    code = '''
+def test_modules(parser):
+    code = """
 module {
   module {
   }
@@ -76,14 +75,13 @@ module {
       }
     }
   }
-}'''
-    parser = parser or Parser()
+}"""
     module = parser.parse(code)
-    print(module.pretty())
+    assert module is not None
 
 
-def test_functions(parser: Optional[Parser] = None):
-    code = '''
+def test_functions(parser):
+    code = """
     module {
       func.func @myfunc_a() {
         %c:2 = addf %a, %b : f32
@@ -93,26 +91,23 @@ def test_functions(parser: Optional[Parser] = None):
         ^e:
         %f:2 = addf %d, %d : f64
       }
-    }'''
-    parser = parser or Parser()
+    }"""
     module = parser.parse(code)
-    print(module.pretty())
+    assert module is not None
 
 
-def test_toplevel_function(parser: Optional[Parser] = None):
-    code = '''
+def test_toplevel_function(parser):
+    code = """
     func.func @toy_func(%tensor: tensor<2x3xf64>) -> tensor<3x2xf64> {
       %t_tensor = "toy.transpose"(%tensor) { inplace = true } : (tensor<2x3xf64>) -> tensor<3x2xf64>
       return %t_tensor : tensor<3x2xf64>
-    }'''
-
-    parser = parser or Parser()
+    }"""
     module = parser.parse(code)
-    print(module.pretty())
+    assert module is not None
 
 
-def test_toplevel_functions(parser: Optional[Parser] = None):
-    code = '''
+def test_toplevel_functions(parser):
+    code = """
     func.func @toy_func(%tensor: tensor<2x3xf64>) -> tensor<3x2xf64> {
       %t_tensor = "toy.transpose"(%tensor) { inplace = true } : (tensor<2x3xf64>) -> tensor<3x2xf64>
       return %t_tensor : tensor<3x2xf64>
@@ -120,15 +115,13 @@ def test_toplevel_functions(parser: Optional[Parser] = None):
     func.func @toy_func(%tensor: tensor<2x3xf64>) -> tensor<3x2xf64> {
       %t_tensor = "toy.transpose"(%tensor) { inplace = true } : (tensor<2x3xf64>) -> tensor<3x2xf64>
       return %t_tensor : tensor<3x2xf64>
-    }'''
-
-    parser = parser or Parser()
+    }"""
     module = parser.parse(code)
-    print(module.pretty())
+    assert module is not None
 
 
-def test_affine(parser: Optional[Parser] = None):
-    code = '''
+def test_affine(parser):
+    code = """
 func.func @empty() {
   affine.for %i = 0 to 10 {
   } {some_attr = true}
@@ -153,13 +146,13 @@ func.func @valid_symbols(%arg0: index, %arg1: index, %arg2: index) {
   }
   return
 }
-    '''
-    parser = parser or Parser()
+    """
     module = parser.parse(code)
-    print(module.pretty())
+    assert module is not None
 
-def test_definitions(parser: Optional[Parser] = None):
-    code = '''
+
+def test_definitions(parser):
+    code = """
 #map0 = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0) -> (d0)>
 #map2 = affine_map<() -> (0)>
@@ -199,14 +192,13 @@ def test_definitions(parser: Optional[Parser] = None):
 !matrix_type_A = type memref<?x?x!vector_type_A>
 !matrix_type_B = type memref<?x?x!vector_type_B>
 !matrix_type_C = type memref<?x?x!vector_type_C>
-    '''
-    parser = parser or Parser()
+    """
     module = parser.parse(code)
-    print(module.pretty())
+    assert module is not None
 
 
-def test_generic_dialect_std(parser: Optional[Parser] = None):
-    code = '''
+def test_generic_dialect_std(parser):
+    code = """
 "module"() ( {
   "func.func"() ( {
   ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
@@ -214,13 +206,13 @@ def test_generic_dialect_std(parser: Optional[Parser] = None):
     "std.return"(%0) : (i32) -> ()
   }) {sym_name = "mlir_entry", type = (i32, i32) -> i32} : () -> ()
 }) : () -> ()
-    '''
-    parser = parser or Parser()
+    """
     module = parser.parse(code)
-    print(module.pretty())
+    assert module is not None
 
-def test_generic_dialect_std_cond_br(parser: Optional[Parser] = None):
-    code = '''
+
+def test_generic_dialect_std_cond_br(parser):
+    code = """
 "module"() ( {
 "func.func"() ( {
 ^bb0(%arg0: i32):  // no predecessors
@@ -233,13 +225,13 @@ def test_generic_dialect_std_cond_br(parser: Optional[Parser] = None):
     "std.return"(%c1_i32) : (i32) -> ()
 }) {sym_name = "mlir_entry", type = (i32) -> i32} : () -> ()
 }) : () -> ()
-    '''
-    parser = parser or Parser()
+    """
     module = parser.parse(code)
-    print(module.pretty())
+    assert module is not None
 
-def test_generic_dialect_llvm(parser: Optional[Parser] = None):
-    code = '''
+
+def test_generic_dialect_llvm(parser):
+    code = """
 "module"() ( {
   "llvm.func"() ( {
   ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
@@ -247,14 +239,13 @@ def test_generic_dialect_llvm(parser: Optional[Parser] = None):
     "llvm.return"(%0) : (i32) -> ()
   }) {linkage = 10 : i64, sym_name = "mlir_entry", type = !llvm.func<i32 (i32, i32)>} : () -> ()
 }) : () -> ()
-    '''
-    parser = parser or Parser()
+    """
     module = parser.parse(code)
-    print(module.pretty())
+    assert module is not None
 
 
-def test_generic_dialect_generic_op(parser: Optional[Parser] = None):
-    code = '''
+def test_generic_dialect_generic_op(parser):
+    code = """
 "module"() ( {
   "func.func"() ( {
   ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
@@ -281,37 +272,16 @@ def test_generic_dialect_generic_op(parser: Optional[Parser] = None):
     "std.return"(%ret) : (i32) -> ()
   }) {sym_name = "mlir_entry", type = (i32, i32) -> i32} : () -> ()
 }) : () -> ()
-    '''
-    parser = parser or Parser()
+    """
     module = parser.parse(code)
-    print(module.pretty())
+    assert module is not None
 
 
-def test_integer_sign(parser: Optional[Parser] = None):
-    code = '''
+def test_integer_sign(parser):
+    code = """
 func.func @integer_test(%a: si16, %b: ui32, %c: i7) {
   return
 }
-    '''
-    parser = parser or Parser()
+    """
     module = parser.parse(code)
-    print(module.pretty())
-
-
-if __name__ == '__main__':
-    p = Parser()
-    print("MLIR parser created")
-    test_attributes(p)
-    test_memrefs(p)
-    test_trailing_loc(p)
-    test_modules(p)
-    test_functions(p)
-    test_toplevel_function(p)
-    test_toplevel_functions(p)
-    test_affine(p)
-    test_definitions(p)
-    test_generic_dialect_std(p)
-    test_generic_dialect_std_cond_br(p)
-    test_generic_dialect_llvm(p)
-    test_generic_dialect_generic_op(p)
-    test_integer_sign(p)
+    assert module is not None

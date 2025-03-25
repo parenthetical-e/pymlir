@@ -1,3 +1,4 @@
+import pytest
 from mlir import parse_string
 from mlir.builder import IRBuilder
 from mlir.builder import Reads, Writes, Isa
@@ -8,7 +9,7 @@ from mlir.dialects.standard import AddfOperation
 def test_saxpy_builder():
     builder = IRBuilder()
     F64 = builder.F64
-    Mref1D = builder.MemRefType(shape=(None, ), dtype=F64)
+    Mref1D = builder.MemRefType(shape=(None,), dtype=F64)
 
     mlirfile = builder.make_mlir_file()
     module = mlirfile.default_module
@@ -33,11 +34,14 @@ def test_saxpy_builder():
 
     builder.func.ret()
 
-    print(mlirfile.dump())
+    # Just verify it doesn't crash - we could add more assertions
+    assert mlirfile.dump() is not None
 
 
 def test_query():
-    block = parse_string("""
+    block = (
+        parse_string(
+            """
 func.func @saxpy(%a : f64, %x : memref<?xf64>, %y : memref<?xf64>) {
 %c0 = constant 0 : index
 %n = dim %x, %c0 : memref<?xf64>
@@ -50,19 +54,24 @@ affine.for %i = 0 to %n {
   affine.store %axpyi, %y[%i] : memref<?xf64>
 }
 return
-}""").default_module.region.body[0].body[0].op.region.body[0]
+}"""
+        )
+        .default_module.region.body[0]
+        .body[0]
+        .op.region.body[0]
+    )
     for_block = block.body[2].op.region.body[0]
 
     c0 = block.body[0].result_list[0].value
 
     def query(expr):
-        return next((op
-                   for op in block.body + for_block.body
-                   if expr(op)))
+        return next((op for op in block.body + for_block.body if expr(op)))
 
     assert query(Writes("%c0")).dump() == "%c0 = constant 0 : index"
-    assert (query(Reads("%y") & Isa(AffineLoadOp)).dump()
-            == "%yi = affine.load %y [ %i ] : memref<?xf64>")
+    assert (
+        query(Reads("%y") & Isa(AffineLoadOp)).dump()
+        == "%yi = affine.load %y [ %i ] : memref<?xf64>"
+    )
 
     assert query(Reads(c0)).dump() == "%n = dim %x , %c0 : memref<?xf64>"
 
@@ -77,15 +86,13 @@ def test_build_with_queries():
     with builder.goto_block(builder.make_block(module.region)):
         fn = builder.function("unorderly_adds")
 
-    a0, a1, b0, b1, c0, c1 = builder.add_function_args(fn, [F64]*6)
+    a0, a1, b0, b1, c0, c1 = builder.add_function_args(fn, [F64] * 6)
 
     fnbody = builder.make_block(fn.region)
     builder.position_at_entry(fnbody)
 
     def index(expr):
-        return next((i
-                   for i, op in enumerate(fnbody.body)
-                   if expr(op)))
+        return next((i for i, op in enumerate(fnbody.body) if expr(op)))
 
     builder.addf(a0, a1, F64)
 
@@ -100,9 +107,3 @@ def test_build_with_queries():
     assert index(Reads(b0)) == 0
     assert index(Reads(c0)) == 1
     assert index(Reads(a0)) == 2
-
-
-if __name__ == '__main__':
-    test_saxpy_builder()
-    test_query()
-    test_build_with_queries()
