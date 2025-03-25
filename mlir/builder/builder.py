@@ -1,9 +1,9 @@
-""" MLIR IR Builder."""
+"""MLIR IR Builder."""
 
 import mlir.astnodes as mast
 import mlir.dialects.standard as std
 import mlir.dialects.affine as affine
-import mlir.dialects.func as func 
+import mlir.dialects.func as func
 from typing import Optional, Tuple, Union, List, Any
 from contextlib import contextmanager
 from mlir.builder.match import Reads, Writes, Isa, All, And, Or, Not  # noqa: F401
@@ -99,11 +99,14 @@ class IRBuilder:
         if item in self._dialects:
             return self._dialects[item]
 
-        return super().__getattr__(item)
+        # Standard behavior for truly missing attributes
+        raise AttributeError(
+            f"'{self.__class__.__name__}' object has no attribute '{item}'"
+        )
 
-    def register_dialect(self, name: str,
-                         dialect_builder: "DialectBuilder",
-                         overwrite: bool = False) -> None:
+    def register_dialect(
+        self, name: str, dialect_builder: "DialectBuilder", overwrite: bool = False
+    ) -> None:
         if name in self._dialects and not overwrite:
             raise ValueError(f"'{name}' already registered as a dialect.")
 
@@ -143,15 +146,13 @@ class IRBuilder:
         if name is None:
             name = self.name_gen("fn")
 
-        op = mast.Function(mast.SymbolRefId(value=name), [], [], None,
-                           mast.Region([]))
+        op = mast.Function(mast.SymbolRefId(value=name), [], [], None, mast.Region([]))
 
         self._insert_op_in_block([], op)
         return op
 
     @classmethod
-    def make_block(cls, region: mast.Region, name: Optional[str] = None
-                   ) -> mast.Block:
+    def make_block(cls, region: mast.Region, name: Optional[str] = None) -> mast.Block:
         """
         Appends a :class:`mlir.astnodes.Block` with name *name* to the *region*.
 
@@ -167,9 +168,13 @@ class IRBuilder:
         return block
 
     @classmethod
-    def add_function_args(cls, function: mast.Function, dtypes: List[mast.Type],
-                          names: Optional[List[str]] = None,
-                          positions: Optional[List[int]] = None):
+    def add_function_args(
+        cls,
+        function: mast.Function,
+        dtypes: List[mast.Type],
+        names: Optional[List[str]] = None,
+        positions: Optional[List[int]] = None,
+    ):
         """
         Adds arguments to *function*.
 
@@ -184,8 +189,9 @@ class IRBuilder:
             function.args = []
 
         if positions is None:
-            positions = list(range(len(function.args),
-                                   len(function.args) + len(dtypes)))
+            positions = list(
+                range(len(function.args), len(function.args) + len(dtypes))
+            )
 
         args = []
 
@@ -196,12 +202,13 @@ class IRBuilder:
 
         return args
 
-    def MemRefType(self,
-                   dtype: mast.Type,
-                   shape: Optional[Tuple[Optional[int], ...]],
-                   offset: Optional[int] = None,
-                   strided: Optional[Tuple[Optional[int], ...]] = None
-                   ) -> mast.MemRefType:
+    def MemRefType(
+        self,
+        dtype: mast.Type,
+        shape: Optional[Tuple[Optional[int], ...]],
+        offset: Optional[int] = None,
+        strided: Optional[Tuple[Optional[int], ...]] = None,
+    ) -> mast.MemRefType:
         """
         Returns an instance of :class:`mlir.astnodes.UnrankedMemRefType` if shape is
         *None*, else returns a :class:`mlir.astnodes.RankedMemRefType`.
@@ -218,15 +225,17 @@ class IRBuilder:
                     offset = 0
                 if strided is not None:
                     if len(shape) != len(strided):
-                        raise ValueError("shapes and strided must be of tuples"
-                                         " of same dimensionality.")
+                        raise ValueError(
+                            "shapes and strided must be of tuples"
+                            " of same dimensionality."
+                        )
                 layout = mast.StridedLayout(strided, offset)
 
             return mast.RankedMemRefType(shape, dtype, layout)
 
-    def _insert_op_in_block(self,
-                            op_results: List[Optional[Union[mast.SsaId, str]]],
-                            op):
+    def _insert_op_in_block(
+        self, op_results: List[Optional[Union[mast.SsaId, str]]], op
+    ):
         new_op_results = []
         for op_result in op_results:
             if op_result is None:
@@ -240,9 +249,9 @@ class IRBuilder:
         if self.block is None:
             raise ValueError("Not within any block to append")
 
-        self.block.body.insert(self.position,
-                               mast.Operation(result_list=new_op_results,
-                                             op=op))
+        self.block.body.insert(
+            self.position, mast.Operation(result_list=new_op_results, op=op)
+        )
         self.position += 1
 
         if len(new_op_results) == 1:
@@ -312,8 +321,9 @@ class IRBuilder:
         self.block = parent_block
         self.position = parent_position
 
-    def position_before(self, query: MatchExpressionBase,
-                        block: Optional[mast.Block] = None):
+    def position_before(
+        self, query: MatchExpressionBase, block: Optional[mast.Block] = None
+    ):
         """
         Positions the builder to the point just before *query* gets matched in
         *block*.
@@ -330,9 +340,9 @@ class IRBuilder:
             self.block = block
 
         try:
-            self.position = next((i
-                                  for i, op in enumerate(self.block.body)
-                                  if query(op)))
+            self.position = next(
+                (i for i, op in enumerate(self.block.body) if query(op))
+            )
         except StopIteration:
             raise ValueError(f"Did not find an operation matching '{query}'.")
 
@@ -353,17 +363,26 @@ class IRBuilder:
             self.block = block
 
         try:
-            self.position = next((i
-                                  for i, op in zip(range(len(self.block.body)-1,
-                                                         -1, -1),
-                                                   reversed(self.block.body))
-                                  if query(op))) + 1
+            self.position = (
+                next(
+                    (
+                        i
+                        for i, op in zip(
+                            range(len(self.block.body) - 1, -1, -1),
+                            reversed(self.block.body),
+                        )
+                        if query(op)
+                    )
+                )
+                + 1
+            )
         except StopIteration:
             raise ValueError(f"Did not find an operation matching '{query}'.")
 
     @contextmanager
-    def goto_before(self, query: MatchExpressionBase,
-                    block: Optional[mast.Block] = None):
+    def goto_before(
+        self, query: MatchExpressionBase, block: Optional[mast.Block] = None
+    ):
         """
         Enters a context to build at the point just before *query* gets matched in
         *block*.
@@ -391,13 +410,14 @@ class IRBuilder:
 
         # accounting for operations added within the context
         if entered_at <= parent_position:
-            parent_position += (exit_at - entered_at)
+            parent_position += exit_at - entered_at
 
         self.position = parent_position + (exit_at - entered_at)
 
     @contextmanager
-    def goto_after(self, query: MatchExpressionBase,
-                   block: Optional[mast.Block] = None):
+    def goto_after(
+        self, query: MatchExpressionBase, block: Optional[mast.Block] = None
+    ):
         """
         Enters a context to build at the point just after *query* gets matched in
         *block*.
@@ -426,7 +446,7 @@ class IRBuilder:
 
         # accounting for operations added within the context
         if entered_at <= parent_position:
-            parent_position += (exit_at - entered_at)
+            parent_position += exit_at - entered_at
 
         self.position = parent_position
 
@@ -434,29 +454,45 @@ class IRBuilder:
 
     # {{{ standard dialect
 
-    def addf(self, op_a: mast.SsaId, op_b: mast.SsaId, type: mast.Type,
-             name: Optional[str] = None):
+    def addf(
+        self,
+        op_a: mast.SsaId,
+        op_b: mast.SsaId,
+        type: mast.Type,
+        name: Optional[str] = None,
+    ):
         op = std.AddfOperation(match=0, operand_a=op_a, operand_b=op_b, type=type)
         return self._insert_op_in_block([name], op)
 
-    def mulf(self, op_a: mast.SsaId, op_b: mast.SsaId, type: mast.Type,
-             name: Optional[str] = None):
+    def mulf(
+        self,
+        op_a: mast.SsaId,
+        op_b: mast.SsaId,
+        type: mast.Type,
+        name: Optional[str] = None,
+    ):
         op = std.MulfOperation(match=0, operand_a=op_a, operand_b=op_b, type=type)
         return self._insert_op_in_block([name], op)
 
-    def dim(self, memref_or_tensor: mast.SsaId, index: mast.SsaId,
-            memref_type: Union[mast.MemRefType, mast.TensorType],
-            name: Optional[str] = None):
-        op = std.DimOperation(match=0, operand=memref_or_tensor, index=index,
-                              type=memref_type)
+    def dim(
+        self,
+        memref_or_tensor: mast.SsaId,
+        index: mast.SsaId,
+        memref_type: Union[mast.MemRefType, mast.TensorType],
+        name: Optional[str] = None,
+    ):
+        op = std.DimOperation(
+            match=0, operand=memref_or_tensor, index=index, type=memref_type
+        )
         return self._insert_op_in_block([name], op)
 
     def index_constant(self, value: int, name: Optional[str] = None):
         op = std.ConstantOperation(match=0, value=value, type=mast.IndexType())
         return self._insert_op_in_block([name], op)
 
-    def float_constant(self, value: float, type: mast.FloatType,
-                       name: Optional[str] = None):
+    def float_constant(
+        self, value: float, type: mast.FloatType, name: Optional[str] = None
+    ):
         op = std.ConstantOperation(match=0, value=value, type=type)
         return self._insert_op_in_block([name], op)
 
@@ -468,6 +504,7 @@ class DialectBuilder:
     """
     A dialect-specific IR Builder.
     """
+
     core_builder: IRBuilder
 
 
@@ -480,9 +517,13 @@ class AffineBuilder(DialectBuilder):
     .. automethod:: store
     """
 
-    def for_(self, lower_bound: Union[int, mast.SsaId],
-             upper_bound: Union[int, mast.SsaId],
-             step: Optional[int] = None, indexname: Optional[str] = None):
+    def for_(
+        self,
+        lower_bound: Union[int, mast.SsaId],
+        upper_bound: Union[int, mast.SsaId],
+        step: Optional[int] = None,
+        indexname: Optional[str] = None,
+    ):
         if indexname is None:
             indexname = self.core_builder.name_gen("i")
             index = mast.AffineSsa(indexname)
@@ -492,44 +533,68 @@ class AffineBuilder(DialectBuilder):
         else:
             match = 1
 
-        op = affine.AffineForOp(match=match,
-                                index=index,
-                                begin=lower_bound, end=upper_bound, step=step,
-                                region=mast.Region(body=[]))
+        op = affine.AffineForOp(
+            match=match,
+            index=index,
+            begin=lower_bound,
+            end=upper_bound,
+            step=step,
+            region=mast.Region(body=[]),
+        )
 
         self.core_builder._insert_op_in_block([], op)
         return op
 
-    def load(self, memref: mast.SsaId,
-             indices: Union[mast.AffineExpr, List[mast.AffineExpr]],
-             memref_type: mast.MemRefType, name: Optional[str] = None):
+    def load(
+        self,
+        memref: mast.SsaId,
+        indices: Union[mast.AffineExpr, List[mast.AffineExpr]],
+        memref_type: mast.MemRefType,
+        name: Optional[str] = None,
+    ):
         if isinstance(indices, mast.AffineExpr):
             indices = [indices]
 
-        op = affine.AffineLoadOp(match=0, arg=memref,
-                                 index=mast.MultiDimAffineExpr(indices),
-                                 type=memref_type)
+        op = affine.AffineLoadOp(
+            match=0,
+            arg=memref,
+            index=mast.MultiDimAffineExpr(indices),
+            type=memref_type,
+        )
         return self.core_builder._insert_op_in_block([name], op)
 
-    def store(self, address: mast.SsaId, memref: mast.SsaId,
-              indices: Union[mast.AffineExpr, List[mast.AffineExpr]],
-              memref_type: mast.MemRefType):
+    def store(
+        self,
+        address: mast.SsaId,
+        memref: mast.SsaId,
+        indices: Union[mast.AffineExpr, List[mast.AffineExpr]],
+        memref_type: mast.MemRefType,
+    ):
         if isinstance(indices, mast.AffineExpr):
             indices = [indices]
 
-        op = affine.AffineStoreOp(match=0, addr=address, ref=memref,
-                                  index=mast.MultiDimAffineExpr(indices),
-                                  type=memref_type)
+        op = affine.AffineStoreOp(
+            match=0,
+            addr=address,
+            ref=memref,
+            index=mast.MultiDimAffineExpr(indices),
+            type=memref_type,
+        )
         self.core_builder._insert_op_in_block([], op)
+
 
 class FuncBuilder(DialectBuilder):
     """
     Func dialect ops builder.
 
-    .. automethod:: ret 
+    .. automethod:: ret
     """
-    def ret(self, values: Optional[List[mast.SsaId]] = None,
-            types: Optional[List[mast.Type]] = None):
+
+    def ret(
+        self,
+        values: Optional[List[mast.SsaId]] = None,
+        types: Optional[List[mast.Type]] = None,
+    ):
 
         op = func.ReturnOperation(match=0, values=values, types=types)
         self.core_builder._insert_op_in_block([], op)
