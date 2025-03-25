@@ -1,4 +1,4 @@
-""" MLIR Dialect representation. """
+"""MLIR Dialect representation."""
 
 import inspect
 from lark import Token
@@ -9,21 +9,25 @@ from dataclasses import dataclass, field
 
 
 def _get_fields(syntax: str):
-    return [
-        tuple(name.split('.'))
-        for name in parse.compile(syntax)._name_types.keys()
-    ]
+    return [tuple(name.split(".")) for name in parse.compile(syntax)._name_types.keys()]
 
 
 @dataclass
 class DialectElement(astnodes.Node):
-    """
-    A class that can be extended by a dialect to define an MLIR AST node.
+    """A class that can be extended by a dialect to define an MLIR AST node.
+
     In the simple case, the subclass only needs to implement a list of syntax
-    rules (in ``_syntax_``) for parsing. See examples for use cases. In more
-    complicated nodes (i.e., with optional or variable-length parameters), a
-    new parsing (as ``__init__``) and dumping (``dump``) methods have to be
+    rules (in ``_syntax_``) for parsing. See examples for use cases.
+
+    In more complicated nodes (i.e., with optional or variable-length parameters),
+    a new parsing (as ``__init__``) and dumping (``dump``) methods have to be
     implemented, along with the node field names (stored in ``_fields_``).
+
+    :param match: The index of the syntax rule to use for parsing.
+
+    :attr _syntax_: A Python string-format syntax for matching this operation,
+                    using a "{name.type}" syntax.
+    :attr _rule_: An optional name for a custom rule in the dialect preamble.
     """
 
     match: int
@@ -34,14 +38,18 @@ class DialectElement(astnodes.Node):
     # may match, a list can be provided. For example:
     # ['return', 'return {values.ssa_use_list} : {types.type_list_no_parens}']
     # will implement the return operation in the Standard dialect.
-    _syntax_: Optional[Union[str, List[str]]] = field(init=False, default=None, repr=False)
+    _syntax_: Optional[Union[str, List[str]]] = field(
+        init=False, default=None, repr=False
+    )
 
     # If custom behavior is defined through the dialect preamble, define rule
     # name on this variable to match this class
     _rule_: Optional[str] = field(init=False, default=None, repr=False)
 
     # Internal fields to be filled by make_rules
-    _syntax_fields_: Optional[List[List[Tuple[str, str]]]] = field(init=False, default=None, repr=False)
+    _syntax_fields_: Optional[List[List[Tuple[str, str]]]] = field(
+        init=False, default=None, repr=False
+    )
     _lark_: Optional[List[str]] = field(init=False, default=None, repr=False)
 
     @classmethod
@@ -53,34 +61,39 @@ class DialectElement(astnodes.Node):
         if isinstance(cls._syntax_, str):
             cls._syntax_ = [cls._syntax_]
         if not isinstance(cls._syntax_, (list, tuple)):
-            raise ValueError('Invalid syntax expression (can only be a string '
-                             'or a list of strings')
+            raise ValueError(
+                "Invalid syntax expression (can only be a string "
+                "or a list of strings"
+            )
         # Collect fields and create lark expressions
         fields = set()
         lark_exprs = []
         compiled_fields = []
         for syntax in cls._syntax_:
-            sfields = _get_fields(syntax)
-            compiled_fields.append(sfields)
-            if any(len(field) != 2 for field in sfields):
+            syntax_fields = _get_fields(syntax)
+            compiled_fields.append(syntax_fields)
+            if any(len(field) != 2 for field in syntax_fields):
                 raise ValueError(
-                    'Syntax matches must provide exactly one name '
-                    'and one type')
-            fields |= set(f[0] for f in sfields)
+                    "Syntax matches must provide exactly one name "
+                    "and one type. "
+                    "Got: %s" % syntax_fields
+                )
+            fields |= set(f[0] for f in syntax_fields)
 
             # Create Lark expression
-            # Replace {{ and }}
-            syntax = syntax.replace('{{', '{LBRACE}').replace('}}', '{RBRACE}')
+            # Replace {{ and }} to avoid conflicts with Lark's internal syntax
+            syntax = syntax.replace("{{", "{LBRACE}").replace("}}", "{RBRACE}")
             # Replace words with strings
-            syntax = ' '.join(
-                (('"%s"' % word) if not word.startswith('{') else word)
-                for word in syntax.split())
+            syntax = " ".join(
+                (('"%s"' % word) if not word.startswith("{") else word)
+                for word in syntax.split()
+            )
             # Replace back {field.type} with types
-            for fname, ftype in sfields:
-                syntax = syntax.replace('{%s.%s}' % (fname, ftype), ftype)
+            for fname, ftype in syntax_fields:
+                syntax = syntax.replace("{%s.%s}" % (fname, ftype), ftype)
             # Replace back braces
-            syntax = syntax.replace('{LBRACE}', '"{"')
-            syntax = syntax.replace('{RBRACE}', '"}"')
+            syntax = syntax.replace("{LBRACE}", '"{"')
+            syntax = syntax.replace("{RBRACE}", '"}"')
             lark_exprs.append(syntax)
 
         cls._fields_ = list(fields)
@@ -89,44 +102,50 @@ class DialectElement(astnodes.Node):
 
     def dump(self, indent: int = 0) -> str:
         if self._syntax_ is None:
-            raise NotImplementedError('Dialect element must either use '
-                                      '"_syntax_" or implement its own '
-                                      '"dump" method')
+            raise NotImplementedError(
+                "Dialect element must either use "
+                '"_syntax_" or implement its own '
+                '"dump" method'
+            )
 
-        sfields = self._syntax_fields_[self.match]
+        syntax_fields = self._syntax_fields_[self.match]
         dump_str = self._syntax_[self.match]
-        for fname, ftype in sfields:
-            dump_str = dump_str.replace('{%s.%s}' % (fname, ftype),
-                                        '{%s}' % fname)
-        return dump_str.format_map({
-            f[0]: astnodes.dump_or_value(getattr(self, f[0]), indent)
-            for f in sfields
-        })
+        for fname, ftype in syntax_fields:
+            dump_str = dump_str.replace("{%s.%s}" % (fname, ftype), "{%s}" % fname)
+        return dump_str.format_map(
+            {
+                f[0]: astnodes.dump_or_value(getattr(self, f[0]), indent)
+                for f in syntax_fields
+            }
+        )
 
 
 class DialectOp(DialectElement):
-    """ A class that can be extended by a dialect to define an MLIR AST node
-        for an operation. See DialectElement for more details. """
+    """A class that can be extended by a dialect to define an MLIR AST node
+    for an operation. See DialectElement for more details."""
+
     pass
 
 
 class DialectType(DialectElement):
-    """ A class that can be extended by a dialect to define an MLIR AST node
-        for a data type. See DialectElement for more details. """
+    """A class that can be extended by a dialect to define an MLIR AST node
+    for a data type. See DialectElement for more details."""
 
     def dump(self, indent: int = 0) -> str:
-        return '!' + super().dump(indent)
+        return "!" + super().dump(indent)
 
 
 class Dialect(object):
     def __init__(
-            self,
-            name: str,
-            ops: Optional[List[Type[DialectOp]]] = None,
-            types: Optional[List[Type[DialectType]]] = None,
-            preamble: Optional[str] = None,
-            transformers: Optional[Dict[str, Union[Callable, Type]]] = None):
+        self,
+        name: str,
+        ops: Optional[List[Type[DialectOp]]] = None,
+        types: Optional[List[Type[DialectType]]] = None,
+        preamble: Optional[str] = None,
+        transformers: Optional[Dict[str, Union[Callable, Type]]] = None,
+    ):
         """
+        Create a new dialect.
 
         :param name: Dialect name (should be unique).
         :param ops: A list of dialect AST nodes for operations.
@@ -135,7 +154,7 @@ class Dialect(object):
         :param transformers: A dictionary that maps between rule names in the
                              Lark preamble to Python classes or AST node types.
         """
-        self.contents = preamble or ''
+        self.contents = preamble or ""
         self.name = name
         self.ops = ops or []
         self.types = types or []
@@ -148,10 +167,15 @@ class Dialect(object):
             typ.make_rules()
 
 
-def add_dialect_rules(dialect: Dialect, elements: List[Type[DialectElement]],
-                      typename: str, rule_dict: Dict[str, Callable]) -> str:
+def add_dialect_rules(
+    dialect: Dialect,
+    elements: List[Type[DialectElement]],
+    typename: str,
+    rule_dict: Dict[str, Callable],
+) -> str:
     """
     Add dialect rules in Lark form to an MLIR parser.
+
     :param dialect: The dialect object to use.
     :param elements: A list of dialect elements (e.g. ops, types) to add.
     :param typename: A prefix to add to the new element rules.
@@ -159,21 +183,27 @@ def add_dialect_rules(dialect: Dialect, elements: List[Type[DialectElement]],
                       Transformer) to add the elements to.
     :return: Lark source code containing new rules as necessary.
     """
-    parser_src = ''
+    parser_src = ""
     for elem in elements:
         if elem._rule_ is not None:  # Custom rules defined in dialect
             rule_dict[elem._rule_] = elem
             continue
         if elem._lark_ is None:
-            raise SyntaxError('Either a "_rule_" or "_syntax_" must '
-                              'be defined for dialect element '
-                              '%s' % elem.__name__)
+            raise SyntaxError(
+                'Either a "_rule_" or "_syntax_" must '
+                "be defined for dialect element "
+                "%s" % elem.__name__
+            )
 
         # Fill contents with procedurally-generated rules
         for i, (rule, sfields) in enumerate(zip(elem._lark_, elem._syntax_fields_)):
-            rule_name = '%s_%s_%s_%d' % (dialect.name, typename,
-                                         elem.__name__.lower(), i)
-            parser_src += '%s: %s\n' % (rule_name, rule)
+            rule_name = "%s_%s_%s_%d" % (
+                dialect.name,
+                typename,
+                elem.__name__.lower(),
+                i,
+            )
+            parser_src += "%s: %s\n" % (rule_name, rule)
 
             # Add rule to transformer
             def create_rule(elem, i):
@@ -186,36 +216,45 @@ def add_dialect_rules(dialect: Dialect, elements: List[Type[DialectElement]],
 
 
 def is_op(member: Any, module: str) -> bool:
-    """ Returns true if an object is a Dialect operation subclass. """
-    return (inspect.isclass(member) and issubclass(member, DialectOp)
-            and member.__module__ == module)
+    """Returns true if an object is a Dialect operation subclass."""
+    return (
+        inspect.isclass(member)
+        and issubclass(member, DialectOp)
+        and member.__module__ == module
+    )
 
 
 def is_type(member: Any, module: str) -> bool:
-    """ Returns true if an object is a Dialect type subclass. """
-    return (inspect.isclass(member) and issubclass(member, DialectType)
-            and member.__module__ == module)
+    """Returns true if an object is a Dialect type subclass."""
+    return (
+        inspect.isclass(member)
+        and issubclass(member, DialectType)
+        and member.__module__ == module
+    )
 
 
 #################################################################
 # Helper classes for dialects
 
+
 @dataclass
 class UnaryOperation(DialectOp):
-    """ Helper class to create unary operations in dialects. """
+    """Helper class to create unary operations in dialects."""
+
     operand: Union[astnodes.SsaId, astnodes.StringLiteral, float, int, bool]
     type: astnodes.Type
     _opname_: str = field(init=False, repr=False)
 
     @classmethod
     def make_rules(cls):
-        cls._syntax_ = '%s {operand.ssa_use} : {type.type}' % cls._opname_
+        cls._syntax_ = "%s {operand.ssa_use} : {type.type}" % cls._opname_
         super().make_rules()
 
 
 @dataclass
 class BinaryOperation(DialectOp):
-    """ Helper class to create binary operations in dialects. """
+    """Helper class to create binary operations in dialects."""
+
     operand_a: Union[astnodes.SsaId, astnodes.StringLiteral, float, int, bool]
     operand_b: Union[astnodes.SsaId, astnodes.StringLiteral, float, int, bool]
     type: astnodes.Type
@@ -224,6 +263,6 @@ class BinaryOperation(DialectOp):
     @classmethod
     def make_rules(cls):
         cls._syntax_ = (
-            '%s {operand_a.ssa_use} , {operand_b.ssa_use} : {type.type}' %
-            cls._opname_)
+            "%s {operand_a.ssa_use} , {operand_b.ssa_use} : {type.type}" % cls._opname_
+        )
         super().make_rules()
