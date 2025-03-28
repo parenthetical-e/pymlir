@@ -25,6 +25,7 @@ from typing import Dict, Optional, Set, Iterable, Tuple
 
 # {{{ unique name generation
 
+
 def generate_unique_names(prefix):
     yield prefix
 
@@ -35,7 +36,8 @@ def generate_unique_names(prefix):
 
 
 def generate_numbered_unique_names(
-        prefix: str, num: Optional[int] = None) -> Iterable[Tuple[int, str]]:
+    prefix: str, num: Optional[int] = None
+) -> Iterable[Tuple[int, str]]:
     if num is None:
         yield (0, prefix)
         num = 0
@@ -51,9 +53,10 @@ class UniqueNameGenerator:
     .. automethod:: is_name_conflicting
     .. automethod:: __call__
     """
-    def __init__(self,
-            existing_names: Optional[Set[str]] = None,
-            forced_prefix: str = ""):
+
+    def __init__(
+        self, existing_names: Optional[Set[str]] = None, forced_prefix: str = ""
+    ):
         if existing_names is None:
             existing_names = set()
 
@@ -69,7 +72,9 @@ class UniqueNameGenerator:
 
         counter = self.prefix_to_counter.get(based_on, None)
 
-        for counter, var_name in generate_numbered_unique_names(based_on, counter):  # noqa: B007,E501
+        for counter, var_name in generate_numbered_unique_names(
+            based_on, counter
+        ):  # noqa: B007,E501
             if not self.is_name_conflicting(var_name):
                 break
 
@@ -77,5 +82,6 @@ class UniqueNameGenerator:
 
         self.existing_names.add(var_name)
         return var_name
+
 
 # }}}
