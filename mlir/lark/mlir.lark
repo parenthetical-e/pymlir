@@ -80,7 +80,7 @@ ssa_use_list     : ssa_use ("," ssa_use)*                                      /
 
 // Standard types
 none_type             : "none"                                                  // None type (similar to void)
-float_type            : "f16" | "bf16" | "f32" | "f64"                          // Floating point types with different precisions
+!float_type            : "f16" | "bf16" | "f32" | "f64"                          // Floating point types with different precisions
 index_type            : "index"                                                 // Index type (for loop induction variables, etc.)
 inttype_width         : /[1-9][0-9]*/                                           // Width for integer types (must be > 0)
 signed_integer_type   : "si" inttype_width                                      // Signed integers like si32
