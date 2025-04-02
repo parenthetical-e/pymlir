@@ -19,13 +19,15 @@ class Parser(object):
     calling ``mlir.parse_*``.
     """
 
-    def __init__(self, dialects: Optional[List[Dialect]] = None):
+    def __init__(self, dialects: Optional[List[Dialect]] = None, debug: bool = False):
         """
         Initializes a reusable pyMLIR parser.
         :param dialects: An optional list of additional dialects to load (in
                          addition to the built-in dialects).
+        :param debug: Whether to enable debug mode for the Lark parser.
         """
         self.dialects = dialects or []
+        self.debug = debug
 
         # Lazy-load (if necessary) the Lark files
         _lazy_load()
@@ -63,7 +65,7 @@ class Parser(object):
         parser_src += op_expr + "\n" + type_expr
 
         # Create parser and tree transformer
-        self.parser = Lark(parser_src, parser="earley")
+        self.parser = Lark(parser_src, parser="earley", debug=debug)
         self.transformer = TreetoMLIR()
 
         # Add dialect rules to transformer
@@ -120,7 +122,9 @@ def _lazy_load():
             _MLIR_LARK = fp.read()
 
 
-def parse_string(code: str, dialects: Optional[List[Dialect]] = None) -> mast.Module:
+def parse_string(
+    code: str, dialects: Optional[List[Dialect]] = None, debug: bool = False
+) -> mast.Module:
     """
     Parses a string representing code in MLIR, returning the top-level AST node.
     :param code: A code string in MLIR format.
@@ -128,11 +132,13 @@ def parse_string(code: str, dialects: Optional[List[Dialect]] = None) -> mast.Mo
                      addition to the built-in dialects).
     :return: A module node representing the root of the AST.
     """
-    parser = Parser(dialects)
+    parser = Parser(dialects, debug)
     return parser.parse(code)
 
 
-def parse_file(file: TextIO, dialects: Optional[List[Dialect]] = None) -> mast.Node:
+def parse_file(
+    file: TextIO, dialects: Optional[List[Dialect]] = None, debug: bool = False
+) -> mast.Node:
     """
     Parses an MLIR file from a given Python file-like object, returning the
     top-level AST node.
@@ -141,10 +147,12 @@ def parse_file(file: TextIO, dialects: Optional[List[Dialect]] = None) -> mast.N
                      addition to the built-in dialects).
     :return: A module node representing the root of the AST.
     """
-    return parse_string(file.read(), dialects)
+    return parse_string(file.read(), dialects, debug)
 
 
-def parse_path(file_path: str, dialects: Optional[List[Dialect]] = None) -> mast.Node:
+def parse_path(
+    file_path: str, dialects: Optional[List[Dialect]] = None, debug: bool = False
+) -> mast.Node:
     """
     Parses an MLIR file from a given filename, returning the top-level AST node.
     :param file_path: Path to file to parse.
@@ -153,7 +161,7 @@ def parse_path(file_path: str, dialects: Optional[List[Dialect]] = None) -> mast
     :return: A module node representing the root of the AST.
     """
     with open(file_path, "r") as fp:
-        return parse_file(fp, dialects)
+        return parse_file(fp, dialects, debug)
 
 
 if __name__ == "__main__":
