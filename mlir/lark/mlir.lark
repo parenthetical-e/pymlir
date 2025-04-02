@@ -19,6 +19,16 @@
 //
 // Adapted from https://github.com/llvm/llvm-project/blob/5b4a01d4a63cb66ab981e52548f940813393bf42/mlir/docs/LangRef.md
 
+%import common.WS
+%ignore WS
+
+LPAR: "("
+RPAR: ")"
+%import common.NEWLINE -> _NL
+%import common.WS_INLINE
+%ignore WS_INLINE
+
+
 // ----------------------------------------------------------------------
 // Low-level literal syntax
 // These rules define the basic building blocks of the grammar
@@ -367,3 +377,4 @@ mlir_file: definition_and_function_list*       -> only_functions_and_definitions
 // COMMENT : "//" /(.)*/ NEWLINE    // Single-line comments (old)
 COMMENT : "//" /[^\n]*/             // Single-line comments (fixed)
 %ignore COMMENT                     // Ignore comments during parsing
+
